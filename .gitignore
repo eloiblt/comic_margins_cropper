@@ -1,7 +1,1 @@
-temp
-*.cbz
-*.pdf
-*.cbr
-*.jpg
-*.png
-*.webp
+temp/**/*
