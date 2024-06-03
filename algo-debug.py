@@ -1,16 +1,14 @@
-import os
-import zipfile
-import rarfile
 from PIL import Image, ImageOps
-from pdf2image import convert_from_path
-import time
-import glob
-import shutil
+import numpy as np
 
-def is_white(r,g,b, tolerance=10):
+def is_white(r,g,b, tolerance=15):
     return r >= 255 - tolerance and g >= 255 - tolerance and b >= 255 - tolerance
 
 def remove_white_margins(image):
+    # The number of checks to get the margin on one side
+    # To prevent to fall between bubbles
+    calcul_precision = 100
+
     width, height = image.size
     step_height = height / calcul_precision
     step_width = width / calcul_precision
@@ -83,7 +81,6 @@ def remove_white_margins(image):
         if y > margin_bottom:
             margin_bottom = y
 
-    # white page
     if margin_right < margin_left or margin_bottom < margin_top:
         return image
 
@@ -91,56 +88,6 @@ def remove_white_margins(image):
 
     return cropped_image
 
-def process(input_path, output_path):
-    os.makedirs(temp_dir, exist_ok=True)
-
-    with zipfile.ZipFile(input_path, 'r') as zip_ref:
-        zip_ref.extractall(temp_dir)
-
-    for root, dirs, files in os.walk(temp_dir):
-        for file in files:
-            if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                image_path = os.path.join(root, file)
-                with Image.open(image_path).convert('RGB') as img:
-                    processed_img = remove_white_margins(img)
-                    processed_img.save(image_path)
-
-    with zipfile.ZipFile(output_path, 'w') as zip_ref:
-        for root, dirs, files in os.walk(temp_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, temp_dir)
-                zip_ref.write(file_path, arcname=arcname)
-
-def clean_temp_folder():
-    shutil.rmtree(temp_dir, ignore_errors=True)
-
-def process_files_in_current_directory():
-    clean_temp_folder()
-
-    files = glob.glob(path + '/**/*.cbz', recursive=True)
-
-    i = 0
-    for file in files:
-        output_file = file.replace('.cbz', '_cropped.cbz')
-
-        process(file, output_file)
-
-        i += 1
-        print(f'{round(i / len(files) * 100, 0)}%')
-
-        clean_temp_folder()
-
-parser = argparse.ArgumentParser(description='Crop CBZ white margin tool.')
-parser.add_argument('path', type=str, help='Folder path to work on')
-args = parser.parse_args()
-
-path = args.path
-temp_dir = os.path.join(path, "temp")
-# The number of checks to get the margin on one side
-# To prevent to fall between bubbles
-calcul_precision = 100
-
-start_time = time.time()
-process_files_in_current_directory()
-print(f'{round(time.time() - start_time, 2)}s')
+with Image.open('003.jpg').convert('RGB') as img:
+    processed_img = remove_white_margins(img)
+    processed_img.save('003_cropped.jpg')
