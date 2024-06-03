@@ -4,6 +4,8 @@ import rarfile
 from PIL import Image, ImageOps
 from pdf2image import convert_from_path
 import time
+import glob
+import shutil
 
 def is_white(r,g,b, tolerance=10):
     return r >= 255 - tolerance and g >= 255 - tolerance and b >= 255 - tolerance
@@ -89,15 +91,11 @@ def remove_white_margins(image):
 
     return cropped_image
 
-def process_cbr_cbz(input_path, output_path):
+def process(input_path, output_path):
     os.makedirs(temp_dir, exist_ok=True)
 
-    if input_path.lower().endswith('.cbz'):
-        with zipfile.ZipFile(input_path, 'r') as zip_ref:
-            zip_ref.extractall(temp_dir)
-    elif input_path.lower().endswith('.cbr'):
-        with rarfile.RarFile(input_path, 'r') as rar_ref:
-            rar_ref.extractall(temp_dir)
+    with zipfile.ZipFile(input_path, 'r') as zip_ref:
+        zip_ref.extractall(temp_dir)
 
     for root, dirs, files in os.walk(temp_dir):
         for file in files:
@@ -107,27 +105,6 @@ def process_cbr_cbz(input_path, output_path):
                     processed_img = remove_white_margins(img)
                     processed_img.save(image_path)
 
-    write_cbz(output_path)
-
-def process_pdf(input_path, output_path):
-    os.makedirs(temp_dir, exist_ok=True)
-
-    images = convert_from_path(input_path, poppler_path = 'bin')
-    print("convert_from_path --- %s seconds ---" % (time.time() - start_time))
-
-    image_paths = []
-    for i, image in enumerate(images):
-        image_path = os.path.join(temp_dir, f'page_{i + 1}.png')
-        processed_img = remove_white_margins(image)
-        processed_img.save(image_path)
-        image_paths.append(image_path)
-
-    print("write --- %s seconds ---" % (time.time() - start_time))
-
-    write_cbz(output_path)
-    print("write_cbz --- %s seconds ---" % (time.time() - start_time))
-
-def write_cbz(output_path):
     with zipfile.ZipFile(output_path, 'w') as zip_ref:
         for root, dirs, files in os.walk(temp_dir):
             for file in files:
@@ -135,33 +112,35 @@ def write_cbz(output_path):
                 arcname = os.path.relpath(file_path, temp_dir)
                 zip_ref.write(file_path, arcname=arcname)
 
+def clean_temp_folder():
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
 def process_files_in_current_directory():
-    for file in os.listdir('.'):
-        if file.lower().endswith('_cropped.cbz'):
-            continue
+    clean_temp_folder()
 
-        if file.lower().endswith('.pdf'):
-            output_file = file.replace('.pdf', '_cropped.cbz')
-            process_pdf(file, output_file)
-        elif file.lower().endswith('.cbr') or file.lower().endswith('.cbz'):
-            output_file = file.replace('.cbz', '_cropped.cbz')
-            output_file = output_file.replace('.pdf', '_cropped.cbz')
-            output_file = output_file.replace('.cbr', '_cropped.cbz')
-            process_cbr_cbz(file, output_file)
+    files = glob.glob(path + '/**/*.cbz', recursive=True)
 
-    # clean temp dir
-    for root, dirs, files in os.walk(temp_dir, topdown=False):
-        for file in files:
-            os.remove(os.path.join(root, file))
-        for dir in dirs:
-            os.rmdir(os.path.join(root, dir))
-    os.rmdir(temp_dir)
+    i = 0
+    for file in files:
+        output_file = file.replace('.cbz', '_cropped.cbz')
 
-temp_dir = './temp'
+        process(file, output_file)
+
+        i += 1
+        print(f'{round(i / len(files) * 100, 0)}%')
+
+        clean_temp_folder()
+
+parser = argparse.ArgumentParser(description='Crop CBZ white margin tool.')
+parser.add_argument('path', type=str, help='Folder path to work on')
+args = parser.parse_args()
+
+path = args.path
+temp_dir = os.path.join(path, "temp")
 # The number of checks to get the margin on one side
 # To prevent to fall between bubbles
 calcul_precision = 100
 
 start_time = time.time()
 process_files_in_current_directory()
-print("--- %s seconds ---" % (time.time() - start_time))
+print(f'{round(time.time() - start_time, 2)}s')
