@@ -124,25 +124,21 @@ def clean_temp_folder():
 def process_files_in_current_directory():
     clean_temp_folder()
 
-    files = glob.glob(path + '/**/*.cbz', recursive=True)
+    if not os.path.isfile(path):
+        raise Exception("Invalid file")
 
-    i = 0
-    for file in files:
-        output_file = file.replace('.cbz', '_cropped.cbz')
-
-        process(file, output_file)
-
-        i += 1
-        print(f'{round(i / len(files) * 100, 0)}%')
-
-        clean_temp_folder()
+    output_file = path.replace('.cbz', '_cropped.cbz')
+    process(path, output_file)
+    clean_temp_folder()
 
 parser = argparse.ArgumentParser(description='Crop CBZ white margin tool.')
-parser.add_argument('path', type=str, help='Folder path to work on')
+parser.add_argument('path', type=str, help='CBZ file')
 args = parser.parse_args()
 
 path = args.path
-temp_dir = os.path.join(path, "temp")
+temp_dir = os.path.join(os.path.dirname(os.path.realpath(path)), "temp")
+
+print(temp_dir)
 # The number of checks to get the margin on one side
 # To prevent to fall between bubbles
 calcul_precision = 100
